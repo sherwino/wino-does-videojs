@@ -1,0 +1,30 @@
+{
+  "name": "wino-does-videojs",
+  "version": "1.0.0",
+  "description": "VideoJS player with dynamic version loading and URL parameter configuration",
+  "main": "dist/bundle.js",
+  "scripts": {
+    "start": "concurrently \"npm run dev\" \"npm run dev-server\"",
+    "dev": "rollup -c -w --bundleConfigAsCjs --environment DEBUG:true",
+    "build": "rollup -c --bundleConfigAsCjs",
+    "build:debug": "rollup -c --bundleConfigAsCjs --environment DEBUG:true",
+    "serve": "npx serve -s dist",
+    "dev-server": "npx serve dist -l 3000",
+    "setup": "node setup.js"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "latest",
+    "@rollup/plugin-html": "latest",
+    "@rollup/plugin-json": "latest",
+    "@rollup/plugin-node-resolve": "latest",
+    "@rollup/plugin-replace": "latest",
+    "@rollup/plugin-terser": "latest",
+    "concurrently": "latest",
+    "rollup": "latest",
+    "rollup-plugin-copy": "latest",
+    "rollup-plugin-livereload": "latest",
+    "rollup-plugin-serve": "latest"
+  }
+}
