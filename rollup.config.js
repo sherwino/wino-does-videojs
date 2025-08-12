@@ -36,11 +36,11 @@ const template = ({ attributes, files, meta, publicPath }) => {
   <div class="video-container">
     <div id="error-container" class="error-overlay">
       <h1>VideoJS 7.14.3</h1>
-      <p class="url-params">URL Params: ?version=x.x.x&source=url&controls=true&autoplay=false</p>
+      <p class="url-params">URL Params: ?version=x.x.x&source=url&autoplay=false&muted=true</p>
       <div id="error-log"></div>
       <div id="player-status" class="player-status"></div>
     </div>
-    <video-js id="video" class="vjs-default-skin" controls preload="auto" width="640" height="264" data-setup="{}">
+    <video-js id="video" class="vjs-default-skin" controls preload="auto" width="640" height="264" muted data-setup="{}">
       <p class="vjs-no-js">
         To view this video please enable JavaScript, and consider upgrading to a web browser that
         <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>.

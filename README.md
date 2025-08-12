@@ -109,24 +109,36 @@ You can configure the VideoJS player using URL parameters:
 Any VideoJS player option can be passed as a URL parameter:
 
 - `controls`: Enable/disable controls (`?controls=true`)
-- `autoplay`: Enable autoplay (`?autoplay=true`) 
+- `autoplay`: Enable autoplay with browser policy compliance (`?autoplay=true`) 
 - `muted`: Start muted (`?muted=true`)
 - `fluid`: Enable fluid sizing (`?fluid=true`)
 - `playbackRates`: Set available playback rates (`?playbackRates=0.5,1,1.5,2`)
 - `preload`: Set preload behavior (`?preload=auto`)
 - `loop`: Enable video looping (`?loop=true`)
 
+**Note on Autoplay**: The application enables autoplay by default with browser policy compliance:
+- Videos autoplay muted by default to meet browser requirements
+- Videos automatically unmute on first progress event (when not explicitly muted)
+- To disable autoplay: `?autoplay=false`
+- To keep muted during autoplay: `?muted=true`
+
 ### Examples
 
 ```bash
-# Load specific VideoJS version with custom source
+# Default behavior (autoplay enabled, unmutes on progress)
+http://localhost:3000/
+
+# Load specific VideoJS version with custom source (still autoplays and unmutes)
 http://localhost:3000/?version=7.14.3&source=https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 
-# Configure player options via URL
-http://localhost:3000/?autoplay=true&muted=false&controls=true&playbackRates=0.75,1,1.25,1.5
+# Autoplay but keep muted
+http://localhost:3000/?muted=true&source=https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+
+# Disable autoplay completely
+http://localhost:3000/?autoplay=false&source=https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 
 # Combine version, source and player options
-http://localhost:3000/?version=8.0.0&source=https://example.com/stream.m3u8&autoplay=true&fluid=false
+http://localhost:3000/?version=8.0.0&source=https://example.com/stream.m3u8&playbackRates=0.75,1,1.25,1.5
 ```
 
 ## Keyboard Controls

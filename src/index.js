@@ -488,6 +488,7 @@ function handleKeyDown(event) {
   }
 }
 
+
 // Initialize player after VideoJS is loaded
 async function initPlayer() {
   try {
@@ -509,11 +510,22 @@ async function initPlayer() {
       responsive: true,
       playbackRates: [0.5, 1, 1.25, 1.5, 2],
       controls: true,
-      preload: 'auto'
+      preload: 'auto',
+      autoplay: true  // Enable autoplay by default
     };
 
     // Merge default options with URL parameters
     const playerOptions = { ...defaultOptions, ...videoJSOptions };
+    
+    // Handle autoplay with mute-first strategy
+    const wantsAutoplay = playerOptions.autoplay;
+    if (wantsAutoplay) {
+      // Always start muted for autoplay compliance
+      playerOptions.autoplay = 'muted';
+      playerOptions.muted = true;
+      // Store original muted preference for progress event handling
+      playerOptions._originalMuted = videoJSOptions.muted;
+    }
 
     // Get stream URL from getCurrentMediaSource (handles params and media list)
     const source = getCurrentMediaSource();
@@ -533,13 +545,6 @@ async function initPlayer() {
     // Add event handlers
     player.ready(function() {
       logStatus("VideoJS player is ready");
-      
-      // Auto-play if specified and not muted by default
-      if (playerOptions.autoplay && !playerOptions.muted) {
-        player.play().catch((err) => {
-          logError(`Autoplay failed: ${err.message}`);
-        });
-      }
     });
 
     player.on('loadedmetadata', function() {
@@ -547,6 +552,14 @@ async function initPlayer() {
       
       // Update rendition info if available
       updateRenditionDisplay(player);
+    });
+
+    // Handle unmuting on progress if autoplay was requested without mute
+    player.on('progress', function() {
+      if (wantsAutoplay && playerOptions._originalMuted !== true && player.muted()) {
+        logStatus("First progress detected, unmuting video");
+        player.muted(false);
+      }
     });
 
     player.on('ended', function() {
