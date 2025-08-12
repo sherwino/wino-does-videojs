@@ -109,12 +109,17 @@ You can configure the VideoJS player using URL parameters:
 Any VideoJS player option can be passed as a URL parameter:
 
 - `controls`: Enable/disable controls (`?controls=true`)
-- `autoplay`: Enable autoplay (`?autoplay=true`) 
+- `autoplay`: Enable autoplay with browser policy compliance (`?autoplay=true`) 
 - `muted`: Start muted (`?muted=true`)
 - `fluid`: Enable fluid sizing (`?fluid=true`)
 - `playbackRates`: Set available playback rates (`?playbackRates=0.5,1,1.5,2`)
 - `preload`: Set preload behavior (`?preload=auto`)
 - `loop`: Enable video looping (`?loop=true`)
+
+**Note on Autoplay**: The application implements smart autoplay handling that complies with browser autoplay policies:
+- Videos start muted to meet autoplay requirements
+- If `muted=false` is specified, the video unmutes after 1 second of successful playback
+- If autoplay fails, it waits for user interaction before starting playback
 
 ### Examples
 

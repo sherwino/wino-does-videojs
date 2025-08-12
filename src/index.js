@@ -488,6 +488,80 @@ function handleKeyDown(event) {
   }
 }
 
+// Handle autoplay with browser policy compliance
+function handleAutoplay(player, playerOptions) {
+  logStatus("Attempting autoplay...");
+  
+  // First, try to detect if autoplay is allowed
+  if (player.autoplay && player.autoplay() !== false) {
+    // VideoJS autoplay is enabled, let it handle automatically
+    logStatus("VideoJS autoplay enabled, letting VideoJS handle");
+    return;
+  }
+  
+  // Manual autoplay handling with mute-first strategy
+  const wasOriginallyMuted = playerOptions.muted;
+  
+  // Step 1: Ensure video is muted for autoplay compliance
+  player.muted(true);
+  
+  // Step 2: Attempt to play
+  const playPromise = player.play();
+  
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        logStatus("Autoplay succeeded (muted)");
+        
+        // Step 3: If originally not meant to be muted, try to unmute after a delay
+        if (!wasOriginallyMuted) {
+          setTimeout(() => {
+            // Check if user hasn't manually muted in the meantime
+            if (player.muted()) {
+              player.muted(false);
+              logStatus("Unmuted after successful autoplay");
+            }
+          }, 1000); // Wait 1 second before unmuting
+        }
+      })
+      .catch((error) => {
+        logError(`Autoplay failed: ${error.message}`);
+        
+        // Fallback: Try with explicit user interaction detection
+        logStatus("Waiting for user interaction to enable autoplay");
+        
+        // Add one-time click listener to start playback
+        const startPlayback = () => {
+          player.muted(wasOriginallyMuted);
+          player.play().then(() => {
+            logStatus("Playback started after user interaction");
+          }).catch((err) => {
+            logError(`Playback failed even after interaction: ${err.message}`);
+          });
+          
+          // Remove listeners
+          document.removeEventListener('click', startPlayback);
+          document.removeEventListener('keydown', startPlayback);
+        };
+        
+        document.addEventListener('click', startPlayback, { once: true });
+        document.addEventListener('keydown', startPlayback, { once: true });
+      });
+  } else {
+    // Older browser or VideoJS version
+    logStatus("Legacy autoplay attempt");
+    try {
+      player.muted(true);
+      player.currentTime(0);
+      if (!wasOriginallyMuted) {
+        setTimeout(() => player.muted(false), 1000);
+      }
+    } catch (error) {
+      logError(`Legacy autoplay failed: ${error.message}`);
+    }
+  }
+}
+
 // Initialize player after VideoJS is loaded
 async function initPlayer() {
   try {
@@ -514,6 +588,15 @@ async function initPlayer() {
 
     // Merge default options with URL parameters
     const playerOptions = { ...defaultOptions, ...videoJSOptions };
+    
+    // Store original autoplay preference and disable VideoJS autoplay for manual handling
+    const wantsAutoplay = playerOptions.autoplay;
+    if (wantsAutoplay) {
+      // Disable VideoJS autoplay, we'll handle it manually
+      playerOptions.autoplay = false;
+      // Store the original preference for our custom handler
+      playerOptions._customAutoplay = true;
+    }
 
     // Get stream URL from getCurrentMediaSource (handles params and media list)
     const source = getCurrentMediaSource();
@@ -534,11 +617,9 @@ async function initPlayer() {
     player.ready(function() {
       logStatus("VideoJS player is ready");
       
-      // Auto-play if specified and not muted by default
-      if (playerOptions.autoplay && !playerOptions.muted) {
-        player.play().catch((err) => {
-          logError(`Autoplay failed: ${err.message}`);
-        });
+      // Handle autoplay with proper browser policy compliance
+      if (playerOptions._customAutoplay) {
+        handleAutoplay(player, playerOptions);
       }
     });
 
@@ -547,6 +628,11 @@ async function initPlayer() {
       
       // Update rendition info if available
       updateRenditionDisplay(player);
+      
+      // Try autoplay again after metadata is loaded (more reliable)
+      if (playerOptions._customAutoplay && !player.hasStarted()) {
+        handleAutoplay(player, playerOptions);
+      }
     });
 
     player.on('ended', function() {
