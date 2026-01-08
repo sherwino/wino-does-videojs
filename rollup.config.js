@@ -1,5 +1,6 @@
 const resolve = require("@rollup/plugin-node-resolve");
 const commonjs = require("@rollup/plugin-commonjs");
+const babel = require("@rollup/plugin-babel");
 const terser = require("@rollup/plugin-terser");
 const replace = require("@rollup/plugin-replace");
 const html = require("@rollup/plugin-html");
@@ -74,6 +75,23 @@ module.exports = {
     // Handle JSON files
     json(),
 
+    // Transpile to ES5 for older browsers (Chrome 52+)
+    babel({
+      babelHelpers: "bundled",
+      exclude: "node_modules/**",
+      presets: [
+        [
+          "@babel/preset-env",
+          {
+            targets: { chrome: "52" },
+            useBuiltIns: "usage",
+            corejs: 3,
+            modules: false,
+          },
+        ],
+      ],
+    }),
+
     // Replace process.env.NODE_ENV
     replace({
       "process.env.NODE_ENV": JSON.stringify(
@@ -86,7 +104,7 @@ module.exports = {
     // Generate HTML file
     html({
       template,
-      publicPath: "",
+      publicPath: "./",
     }),
 
     // Copy static assets

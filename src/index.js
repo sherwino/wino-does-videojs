@@ -1,3 +1,6 @@
+// Import polyfills for older browsers (Chrome 52+)
+import "regenerator-runtime/runtime.js";
+
 // Global variables for logging
 let errorLog;
 let playerStatus;

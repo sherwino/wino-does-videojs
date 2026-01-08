@@ -10,6 +10,19 @@ A modern VideoJS implementation with dynamic version loading and URL parameter c
 - API-driven media list with fallback sources  
 - Minification and sourcemaps for production/debugging
 - Modern bundling with Rollup
+- **Chrome 52+ compatibility** with automatic transpilation and polyfills
+
+## Browser Compatibility
+
+This project is compatible with:
+- ✅ Chrome 52+ (July 2016)
+- ✅ Firefox 48+ (August 2016)
+- ✅ Safari 10+ (September 2016)
+- ✅ Edge 14+ (August 2016)
+- ✅ iOS Safari 10+
+- ✅ Android Chrome 52+
+
+The build process automatically transpiles modern JavaScript to ES5 and includes necessary polyfills. See [CHROME52-COMPATIBILITY.md](./CHROME52-COMPATIBILITY.md) for technical details.
 
 ## Getting Started
 

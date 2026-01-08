@@ -12,9 +12,10 @@
     "dev-server": "npx serve dist -l 3000",
     "setup": "node setup.js"
   },
-  "dependencies": {
-  },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
+    "@rollup/plugin-babel": "^6.1.0",
     "@rollup/plugin-commonjs": "latest",
     "@rollup/plugin-html": "latest",
     "@rollup/plugin-json": "latest",
@@ -22,6 +23,8 @@
     "@rollup/plugin-replace": "latest",
     "@rollup/plugin-terser": "latest",
     "concurrently": "latest",
+    "core-js": "^3.47.0",
+    "regenerator-runtime": "^0.14.1",
     "rollup": "latest",
     "rollup-plugin-copy": "latest",
     "rollup-plugin-livereload": "latest",
