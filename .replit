@@ -8,3 +8,6 @@ channel = "stable-25_05"
 build = ["sh", "-c", "npm run build"]
 deploymentTarget = "static"
 publicDir = "dist/"
+
+[agent]
+expertMode = true
