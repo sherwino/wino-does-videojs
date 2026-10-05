@@ -1,2 +1,3 @@
 - [SSAI scope](ssai-scope.md) — playback of stitched HLS ads only; no client-side tracking requested.
 - [HLS browser verification](hls-browser-verification.md) — static screenshot capture and installed Chromium can differ in media playback support.
+- [Supplied-source overlay](supplied-source-overlay.md) — omit media-list labels for URL sources; clip overlay overflow with ellipses, never scrollbars.

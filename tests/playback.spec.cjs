@@ -47,10 +47,7 @@ test("naturally plays stitched content, ad, and resumed content", async ({ page,
   });
   await page.goto(url);
   await waitForPlayer(page);
-  await expect(page.locator(".media-info")).toContainText("URL source");
-  await expect(page.locator(".media-info")).toContainText("/fixtures/master.m3u8");
-  await expect(page.locator(".media-info")).not.toContainText("Big Buck");
-  await expect(page.locator(".media-info")).not.toContainText("session=");
+  await expect(page.locator(".media-info")).toBeHidden();
   expect((await playerState(page)).version).toBe("7.14.3");
   const before = await expectPhase(page, 0.5, 3.5, 2);
   await page.screenshot({ path: testInfo.outputPath("content-before.png") });
@@ -88,9 +85,62 @@ test("manual audible playback, mute control, and ordinary source changes work", 
   await page.waitForFunction(() => window.videojsPlayer.currentTime() > 1);
   expect((await playerState(page)).source).toContain("/fixtures/ordinary.m3u8");
   expect((await playerState(page)).error).toBeNull();
-  await expect(page.locator(".media-info")).toContainText("Custom source");
-  await expect(page.locator(".media-info")).toContainText("/fixtures/ordinary.m3u8");
+  await expect(page.locator(".media-info")).toBeHidden();
   await expect(page.locator(".rendition-info")).toContainText("640x360");
+});
+
+test("provided source skips sample feed and clips overlay lines without scrollbars", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  let feedRequests = 0;
+  await page.route("**/static_feeds/*.json", (route) => {
+    feedRequests++;
+    return route.fulfill({ json: { entry: [
+      { title: "Big Buck Bunny (AES-128)", content: { src: "/fixtures/ordinary.m3u8" } },
+    ] } });
+  });
+  await page.goto(`${url}&autoplay=false`);
+  await waitForPlayer(page);
+  await expect(page.locator(".media-info")).toBeHidden();
+  expect(feedRequests).toBe(0);
+  await expect(page.locator("#error-container")).not.toContainText("Big Buck");
+  for (const key of ["ArrowUp", "ArrowDown"]) await page.keyboard.press(key);
+  expect((await playerState(page)).source).toContain(source);
+  // Simulate a stale label and a very long diagnostic line.
+  await page.evaluate(() => {
+    const label = document.createElement("p");
+    label.className = "media-info";
+    label.textContent = "Big Buck Bunny (1/5)";
+    document.querySelector("#error-container").appendChild(label);
+    document.querySelector(".url-params").textContent = "URL Params: " + "long-value".repeat(100);
+    const log = document.querySelector("#error-log");
+    for (let i = 0; i < 30; i++) {
+      const line = document.createElement("div");
+      line.textContent = "Long error: " + "details".repeat(100);
+      log.appendChild(line);
+    }
+    window.videojsPlayer.trigger("loadedmetadata");
+  });
+  await expect(page.locator(".media-info")).toBeHidden();
+  await expect(page.locator(".media-info")).toHaveText("");
+  const styles = await page.evaluate(() => {
+    const style = (selector) => {
+      const el = document.querySelector(selector);
+      const css = getComputedStyle(el);
+      return { x: css.overflowX, y: css.overflowY, ellipsis: css.textOverflow,
+        nowrap: css.whiteSpace, width: el.clientWidth, contentWidth: el.scrollWidth };
+    };
+    return { overlay: style("#error-container"), log: style("#error-log"),
+      params: style(".url-params"), line: style("#error-log > div") };
+  });
+  for (const item of Object.values(styles)) {
+    expect(item.x).toBe("hidden");
+    expect(item.y).toBe("hidden");
+  }
+  for (const item of [styles.params, styles.line]) {
+    expect(item.ellipsis).toBe("ellipsis");
+    expect(item.nowrap).toBe("nowrap");
+    expect(item.contentWidth).toBeGreaterThan(item.width);
+  }
 });
 
 test("malformed source encoding fails explicitly without fallback", async ({ page }) => {

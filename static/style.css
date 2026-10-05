@@ -36,7 +36,7 @@ video {
   color: #ffffff;
   padding: 1rem 10px;
   box-sizing: border-box;
-  overflow-y: auto;
+  overflow: hidden;
   z-index: 10;
   /* Diagnostics must not intercept Play or volume controls underneath. */
   pointer-events: none;
@@ -68,7 +68,16 @@ video {
   font-family: monospace;
   font-size: 12px;
   max-height: 200px;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.error-overlay h1,
+.error-overlay p,
+.error-overlay .player-status,
+#error-log > div {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 #error-log > div {

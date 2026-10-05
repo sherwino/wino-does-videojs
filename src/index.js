@@ -1,6 +1,7 @@
 // Import polyfills for older browsers (Chrome 52+)
 import "regenerator-runtime/runtime.js";
 import { parsePlayerQuery, applyPlaybackPolicy, displayParams } from "./player-config.mjs";
+import { describeMediaSource } from "./media-info.mjs";
 
 // Global variables for logging
 let errorLog;
@@ -210,6 +211,15 @@ function updateUrlParamsDisplay() {
 
 // Update media info display
 function updateMediaInfoDisplay() {
+  // A URL-supplied stream has no media-list title or position to display.
+  if (getUrlParams().source) {
+    const existing = document.querySelector(".media-info");
+    if (existing) {
+      existing.textContent = "";
+      existing.style.display = "none";
+    }
+    return;
+  }
   const mediaInfoElement = document.querySelector(".media-info");
   if (!mediaInfoElement) {
     // Create it if it doesn't exist
@@ -223,28 +233,19 @@ function updateMediaInfoDisplay() {
 
   const mediaInfoElement2 = document.querySelector(".media-info");
   if (mediaInfoElement2) {
-    if (sourceOverrideActive) {
-      mediaInfoElement2.textContent = "Media: Provided HLS source (URL hidden)";
-      mediaInfoElement2.style.display = "block";
-    } else if (mediaEntries.length > 0) {
-      const currentEntry = mediaEntries[currentMediaIndex];
-      mediaInfoElement2.textContent = `Media: ${currentEntry.title} (${
-        currentMediaIndex + 1
-      }/${mediaEntries.length})`;
-      mediaInfoElement2.style.display = "block";
-    } else {
-      // Fall back to MEDIA object
-      const mediaKeys = Object.keys(MEDIA);
-      if (mediaKeys.length > 0) {
-        const currentKey = mediaKeys[currentMediaIndex];
-        mediaInfoElement2.textContent = `Media: ${currentKey} (${
-          currentMediaIndex + 1
-        }/${mediaKeys.length})`;
-        mediaInfoElement2.style.display = "block";
-      } else {
-        mediaInfoElement2.textContent = "No media sources available";
-      }
-    }
+    const player = window.videojsPlayer;
+    const actualSource = player ? player.currentSource().src : getCurrentMediaSource();
+    mediaInfoElement2.textContent = describeMediaSource(actualSource, {
+      baseUrl: window.location.href,
+      entries: mediaEntries,
+      fallbackSources: MEDIA,
+    });
+    mediaInfoElement2.style.display = "block";
+    const feedSources = mediaEntries.length
+      ? mediaEntries.map((entry) => entry.content.src)
+      : Object.keys(MEDIA).map((key) => MEDIA[key]);
+    sourceOverrideActive = !feedSources.some((src) =>
+      new URL(src, window.location.href).href === new URL(actualSource, window.location.href).href);
   }
 }
 
@@ -335,6 +336,7 @@ async function loadVideoJSVersion() {
 
 // Play next video function
 function playNextVideo() {
+  if (getUrlParams().source) return;
   sourceOverrideActive = false;
   if (mediaEntries.length > 0) {
     currentMediaIndex = (currentMediaIndex + 1) % mediaEntries.length;
@@ -391,6 +393,7 @@ function handleKeyDown(event) {
 
   switch (event.key) {
     case "ArrowUp":
+      if (getUrlParams().source) break;
       sourceOverrideActive = false;
       if (mediaEntries.length > 0) {
         // Move to next video, loop back to first if at the end
@@ -419,6 +422,7 @@ function handleKeyDown(event) {
       updateMediaInfoDisplay();
       break;
     case "ArrowDown":
+      if (getUrlParams().source) break;
       sourceOverrideActive = false;
       if (mediaEntries.length > 0) {
         // Move to previous video, loop to last if at the beginning
@@ -518,16 +522,25 @@ async function initPlayer() {
 
     // Initialize VideoJS player
     const player = videojs('video', playerOptions);
+    window.videojsPlayer = player;
 
     // Add event handlers
+    player.on('loadstart', function() {
+      updateMediaInfoDisplay();
+      if (renditionInfo) renditionInfo.textContent = "Resolution: Waiting for video data...";
+    });
     player.ready(function() {
       logStatus("VideoJS player is ready");
     });
 
     player.on('loadedmetadata', function() {
       logStatus("Stream metadata loaded");
+      updateMediaInfoDisplay();
       
       // Update rendition info if available
+      updateRenditionDisplay(player);
+    });
+    player.on('resize', function() {
       updateRenditionDisplay(player);
     });
 

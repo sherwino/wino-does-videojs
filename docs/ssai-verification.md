@@ -21,11 +21,12 @@ Each period was independently encoded with reset timestamps. `EXT-X-DISCONTINUIT
 - Default autoplay stayed muted throughout. Manual audible Play, the M mute control, and a change to ordinary non-ad HLS worked.
 - The selected source retained its embedded equals signs, comma, signature plus sign, and encoded delimiter.
 - Only one active Video.js player existed. The supplied stream stayed selected after ending.
-- The overlay labeled the URL-provided source, not Big Buck Bunny or an unrelated playlist position, and withheld signed query values.
+- For a URL-provided source, the overlay omits the media-list label entirely and withholds signed query values. Sample feed loading and Up/Down sample navigation are bypassed.
+- Narrow-screen checks verify hidden overflow and single-line ellipses for long parameters and diagnostics, without overlay or log scrollbars.
 - A separate browser case started with a mocked Big Buck Bunny feed entry, changed the player source directly, and confirmed the overlay followed the actual stream. Keyboard navigation then correctly displayed the newly selected feed entry.
 - Malformed URL encoding produced an actionable error without loading a fallback stream.
 
-Verification commands: `npm test` (14 checks), `npm run build`, and `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/repl/tools/bin/chromium npm run test:playback` (4 browser cases). Browser checks are in `tests/playback.spec.cjs`; screenshots and JSON evidence are generated under ignored `test-results/`.
+Verification commands: `npm test` (14 checks), `npm run build`, and `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/repl/tools/bin/chromium npm run test:playback` (5 browser cases). Browser checks are in `tests/playback.spec.cjs`; screenshots and JSON evidence are generated under ignored `test-results/`.
 
 ## Limitations
 
