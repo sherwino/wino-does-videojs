@@ -1,7 +1,6 @@
 // Import polyfills for older browsers (Chrome 52+)
 import "regenerator-runtime/runtime.js";
 import { parsePlayerQuery, applyPlaybackPolicy, displayParams } from "./player-config.mjs";
-import { describeMediaSource } from "./media-info.mjs";
 
 // Global variables for logging
 let errorLog;
@@ -29,13 +28,9 @@ const MEDIA_API_URL =
 // Initial media index
 let currentMediaIndex = 0;
 let sourceOverrideActive = false;
-let selectedSource = "";
-let playbackHasError = false;
 
 // Utility functions for logging
 function logError(message) {
-  playbackHasError = true;
-  if (playerStatus) playerStatus.textContent = `[error] ${message}`;
   if (!errorLog) return;
 
   const errorItem = document.createElement("div");
@@ -69,7 +64,7 @@ function logStatus(message) {
   errorLog.appendChild(statusItem);
 
   // Also update player status if available
-  if (playerStatus && !playbackHasError) {
+  if (playerStatus) {
     playerStatus.textContent = `[info] ${message}`;
   }
 
@@ -202,7 +197,7 @@ function updateUrlParamsDisplay() {
   if (urlParamsElement) {
     const hasParams = Object.keys(urlParams).length > 0;
     if (hasParams) {
-      urlParamsElement.textContent = "Initial URL options: " + JSON.stringify(displayParams(urlParams));
+      urlParamsElement.textContent = "URL Params: " + JSON.stringify(displayParams(urlParams));
       urlParamsElement.style.display = "block";
     } else {
       urlParamsElement.style.display = "none";
@@ -228,24 +223,28 @@ function updateMediaInfoDisplay() {
 
   const mediaInfoElement2 = document.querySelector(".media-info");
   if (mediaInfoElement2) {
-    const player = window.videojsPlayer;
-    const actualSource = (player && player.currentSource().src) || selectedSource;
-    const urlParams = getUrlParams();
-    mediaInfoElement2.textContent = describeMediaSource(actualSource, {
-      baseUrl: window.location.href,
-      providedSource: urlParams.source,
-      entries: mediaEntries,
-      fallbackSources: MEDIA,
-    });
-    mediaInfoElement2.style.display = "block";
-    // Derive navigation behavior from the actual source, not stale feed position.
-    const feedSources = mediaEntries.length
-      ? mediaEntries.map((entry) => entry.content.src)
-      : Object.keys(MEDIA).map((key) => MEDIA[key]);
-    const actualUrl = actualSource ? new URL(actualSource, window.location.href).href : "";
-    sourceOverrideActive = Boolean(urlParams.source &&
-      actualUrl === new URL(urlParams.source, window.location.href).href) ||
-      !feedSources.some((src) => new URL(src, window.location.href).href === actualUrl);
+    if (sourceOverrideActive) {
+      mediaInfoElement2.textContent = "Media: Provided HLS source (URL hidden)";
+      mediaInfoElement2.style.display = "block";
+    } else if (mediaEntries.length > 0) {
+      const currentEntry = mediaEntries[currentMediaIndex];
+      mediaInfoElement2.textContent = `Media: ${currentEntry.title} (${
+        currentMediaIndex + 1
+      }/${mediaEntries.length})`;
+      mediaInfoElement2.style.display = "block";
+    } else {
+      // Fall back to MEDIA object
+      const mediaKeys = Object.keys(MEDIA);
+      if (mediaKeys.length > 0) {
+        const currentKey = mediaKeys[currentMediaIndex];
+        mediaInfoElement2.textContent = `Media: ${currentKey} (${
+          currentMediaIndex + 1
+        }/${mediaKeys.length})`;
+        mediaInfoElement2.style.display = "block";
+      } else {
+        mediaInfoElement2.textContent = "No media sources available";
+      }
+    }
   }
 }
 
@@ -503,7 +502,6 @@ async function initPlayer() {
 
     // Get stream URL from getCurrentMediaSource (handles params and media list)
     const source = getCurrentMediaSource();
-    selectedSource = source;
     sourceOverrideActive = Boolean(urlParams.source);
     const resolvedSource = new URL(source, window.location.href);
     if (!["http:", "https:"].includes(resolvedSource.protocol)) {
@@ -520,28 +518,16 @@ async function initPlayer() {
 
     // Initialize VideoJS player
     const player = videojs('video', playerOptions);
-    window.videojsPlayer = player;
 
     // Add event handlers
     player.ready(function() {
       logStatus("VideoJS player is ready");
-      updateMediaInfoDisplay();
-    });
-
-    player.on('loadstart', function() {
-      playbackHasError = Boolean(player.error());
-      updateMediaInfoDisplay();
-      updateRenditionDisplay(player, true);
-      logStatus("Loading selected HLS source");
     });
 
     player.on('loadedmetadata', function() {
       logStatus("Stream metadata loaded");
-      updateMediaInfoDisplay();
+      
       // Update rendition info if available
-      updateRenditionDisplay(player);
-    });
-    player.on('resize', function() {
       updateRenditionDisplay(player);
     });
 
@@ -578,7 +564,7 @@ async function initPlayer() {
 }
 
 // Function to update rendition information display
-function updateRenditionDisplay(player, loading = false) {
+function updateRenditionDisplay(player) {
   if (!renditionInfo) {
     // Create it if it doesn't exist
     const container = document.querySelector("#error-container");
@@ -590,11 +576,6 @@ function updateRenditionDisplay(player, loading = false) {
   }
 
   if (!renditionInfo || !player) return;
-  if (loading) {
-    renditionInfo.textContent = "Resolution: Waiting for selected source";
-    renditionInfo.style.display = "block";
-    return;
-  }
 
   // Get video element dimensions
   const videoEl = player.el().querySelector('video');
@@ -604,9 +585,7 @@ function updateRenditionDisplay(player, loading = false) {
     
     // VideoJS doesn't expose bitrate as easily as HLS.js
     // but we can show resolution info
-    renditionInfo.textContent = width && height
-      ? `Resolution: ${width}x${height}`
-      : "Resolution: Waiting for video dimensions";
+    renditionInfo.textContent = `Resolution: ${width}x${height}`;
     renditionInfo.style.display = "block";
   } else {
     renditionInfo.textContent = "Resolution: Waiting for video data...";
