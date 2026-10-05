@@ -47,6 +47,10 @@ test("naturally plays stitched content, ad, and resumed content", async ({ page,
   });
   await page.goto(url);
   await waitForPlayer(page);
+  await expect(page.locator(".media-info")).toContainText("URL source");
+  await expect(page.locator(".media-info")).toContainText("/fixtures/master.m3u8");
+  await expect(page.locator(".media-info")).not.toContainText("Big Buck");
+  await expect(page.locator(".media-info")).not.toContainText("session=");
   expect((await playerState(page)).version).toBe("7.14.3");
   const before = await expectPhase(page, 0.5, 3.5, 2);
   await page.screenshot({ path: testInfo.outputPath("content-before.png") });
@@ -84,6 +88,9 @@ test("manual audible playback, mute control, and ordinary source changes work", 
   await page.waitForFunction(() => window.videojsPlayer.currentTime() > 1);
   expect((await playerState(page)).source).toContain("/fixtures/ordinary.m3u8");
   expect((await playerState(page)).error).toBeNull();
+  await expect(page.locator(".media-info")).toContainText("Custom source");
+  await expect(page.locator(".media-info")).toContainText("/fixtures/ordinary.m3u8");
+  await expect(page.locator(".rendition-info")).toContainText("640x360");
 });
 
 test("malformed source encoding fails explicitly without fallback", async ({ page }) => {
@@ -91,4 +98,24 @@ test("malformed source encoding fails explicitly without fallback", async ({ pag
   await expect(page.locator("#error-log")).toContainText("Invalid URL encoding");
   expect(await page.evaluate(() => window.videojsPlayer)).toBeUndefined();
   await expect(page.locator("#error-log")).not.toContainText("private");
+});
+
+test("overlay follows external source changes rather than Big Buck Bunny feed position", async ({ page }) => {
+  await page.route("**/static_feeds/*.json", (route) => route.fulfill({
+    json: { entry: [
+      { title: "Big Buck Bunny", content: { src: "/fixtures/ordinary.m3u8" } },
+      { title: "Stitched test", content: { src: "/fixtures/master.m3u8" } },
+    ] },
+  }));
+  await page.goto("/?autoplay=false");
+  await waitForPlayer(page);
+  await expect(page.locator(".media-info")).toContainText("Big Buck Bunny (1/2)");
+  await page.evaluate(() => window.videojsPlayer.src({
+    src: "/fixtures/master.m3u8?sig=private", type: "application/x-mpegURL",
+  }));
+  await expect(page.locator(".media-info")).toContainText("Custom source");
+  await expect(page.locator(".media-info")).not.toContainText("Big Buck");
+  await expect(page.locator(".media-info")).not.toContainText("private");
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator(".media-info")).toContainText("Stitched test (2/2)");
 });

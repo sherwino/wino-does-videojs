@@ -38,6 +38,8 @@ video {
   box-sizing: border-box;
   overflow-y: auto;
   z-index: 10;
+  /* Diagnostics must not intercept Play or volume controls underneath. */
+  pointer-events: none;
   font-size: 14px;
   line-height: 1.4;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);

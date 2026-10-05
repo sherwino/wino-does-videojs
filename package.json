@@ -19,6 +19,7 @@
   "devDependencies": {
     "@babel/core": "^7.28.5",
     "@babel/preset-env": "^7.28.5",
+    "@playwright/test": "^1.63.0",
     "@rollup/plugin-babel": "^6.1.0",
     "@rollup/plugin-commonjs": "latest",
     "@rollup/plugin-html": "latest",
@@ -33,8 +34,5 @@
     "rollup-plugin-copy": "latest",
     "rollup-plugin-livereload": "latest",
     "rollup-plugin-serve": "latest"
-  },
-  "dependencies": {
-    "@playwright/test": "^1.63.0"
   }
 }

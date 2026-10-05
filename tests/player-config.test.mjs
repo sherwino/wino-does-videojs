@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parsePlayerQuery, applyPlaybackPolicy, displayParams } from "../src/player-config.mjs";
+import { describeMediaSource, safeSourceLabel } from "../src/media-info.mjs";
 
 test("preserves an encoded SSAI URL including signatures and delimiters", () => {
   const source = "https://cdn.example/playlist.m3u8?session=a=b==&paths=one,two&sig=a+b%2F%26";
@@ -73,4 +74,29 @@ test("single initialization and no download-triggered unmute", () => {
   assert.equal(template.includes('data-setup="{}"'), false);
   assert.equal(app.includes("player.on('progress'"), false);
   assert.ok(app.includes("if (sourceOverrideActive)"));
+});
+
+test("URL source takes precedence over Big Buck Bunny feed information", () => {
+  const entries = [{ title: "Big Buck Bunny", content: { src: "https://cdn.example/bunny.m3u8" } }];
+  const label = describeMediaSource("/actual.m3u8?sig=private", {
+    baseUrl: "https://player.example/", providedSource: "/actual.m3u8?sig=private", entries,
+  });
+  assert.equal(label, "Media: URL source — player.example/actual.m3u8");
+  assert.equal(label.includes("Big Buck Bunny"), false);
+  assert.equal(label.includes("private"), false);
+});
+
+test("source changes use actual source matching rather than playlist index", () => {
+  const entries = [
+    { title: "Big Buck Bunny", content: { src: "/bunny.m3u8" } },
+    { title: "Oceans", content: { src: "/oceans.m3u8" } },
+  ];
+  const config = { baseUrl: "https://player.example/", entries };
+  assert.equal(describeMediaSource("https://player.example/oceans.m3u8", config), "Media: Oceans (2/2)");
+  assert.equal(describeMediaSource("/other.m3u8", config), "Media: Custom source — player.example/other.m3u8");
+});
+
+test("safe source labels hide query, fragment, and credentials", () => {
+  assert.equal(safeSourceLabel("https://user:password@cdn.example/ad.m3u8?token=private#secret"),
+    "cdn.example/ad.m3u8");
 });

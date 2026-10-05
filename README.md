@@ -131,17 +131,18 @@ Any VideoJS player option can be passed as a URL parameter:
 
 **Note on Autoplay**: The application enables autoplay by default with browser policy compliance:
 - Videos autoplay muted by default to meet browser requirements
-- Videos automatically unmute on first progress event (when not explicitly muted)
+- Videos stay muted until the viewer unmutes with the volume control or **M** key. Download progress is not a user gesture.
 - To disable autoplay: `?autoplay=false`
 - To keep muted during autoplay: `?muted=true`
+- An explicit `?muted=false` requests audible playback. Browsers may block audible autoplay; press Play or Enter to begin.
 
 ### Examples
 
 ```bash
-# Default behavior (autoplay enabled, unmutes on progress)
+# Default behavior (muted autoplay; viewer can unmute)
 http://localhost:3000/
 
-# Load specific VideoJS version with custom source (still autoplays and unmutes)
+# Load specific VideoJS version with custom source (muted autoplay)
 http://localhost:3000/?version=7.14.3&source=https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 
 # Autoplay but keep muted
@@ -184,6 +185,51 @@ The application automatically converts URL parameters to VideoJS configuration:
 2. **Option Filtering**: Special parameters (`version`, `source`) are handled separately from VideoJS options
 
 3. **Default Options**: Sensible defaults are provided and can be overridden via URL parameters
+
+### Stitched SSAI playback
+
+The player plays HLS ads when the SSAI provider has already inserted the ad **media segments** into the playlist. Video.js 7.14.3 includes the HLS playback engine; no New Relic tracker, Brightcove SSAI plugin, or ad analytics is required for this playback-only use case. Brightcove's plugin registry describes plugins for Brightcove Player, not a universal plugin requirement for plain Video.js.
+
+Use the provider's **stitched playback manifest**, not the original content manifest, VAST URL, tracking endpoint, or session-initialization JSON URL. This app does not create SSAI sessions. For client-initialized services, obtain the playback URL through the provider's initialization process first.
+
+Encode the **entire** nested source URL once so its `&`, `+`, `=`, commas, and already-encoded values survive the outer player query:
+
+```javascript
+const stitchedUrl = "https://cdn.example/playlist.m3u8?session=a=b==&paths=one,two&sig=a+b%2F";
+const playerUrl = "/?source=" + encodeURIComponent(stitchedUrl) + "&version=7.14.3";
+```
+
+`source` and `version` remain strings; other player options retain their boolean, numeric, and comma-array conversions. Raw ampersands belong to the outer query, so a source containing query parameters must be encoded. Malformed percent encoding, empty sources, and invalid version values produce an initialization error instead of silently selecting a sample video. The full source URL is hidden from application status logs and the parameter display. The media overlay identifies the actual selected source by host/path, without URL credentials, query values, or fragments; it never substitutes an unrelated feed title such as Big Buck Bunny. The full URL remains available in browser network tools and `window.videojsPlayer.currentSrc()`. Do not share signed playback URLs or browser traces publicly.
+
+A supplied source does not depend on the sample-feed API and remains selected when it ends. Up/Down can still select the built-in sample streams, deliberately leaving that supplied session.
+
+**Provider requirements and limitations**
+
+- The provider must fill the break and include playable ad segments in the media playlist. A no-fill break cannot produce an ad.
+- `EXT-X-CUE-OUT`, SCTE-35, or `EXT-X-DATERANGE` tags alone do not make this player fetch VAST or insert separate ad assets. HLS interstitials using separate asset URIs (server-guided insertion) are not supported by this implementation.
+- Codec/container changes, timestamp resets, and encryption changes must be represented correctly in the HLS stream (including discontinuities and keys where required).
+- The master/media playlists, content/ad segments, and encryption keys must be reachable. Cross-origin playback must permit the necessary CORS requests; signed URLs must be valid. HTTPS pages must not request HTTP-only media.
+- Ad beacons, impressions, quartiles, ad UI, and preventing seeks through ads are intentionally not implemented. Configure reporting with your provider separately if needed.
+
+See [SSAI verification results](docs/ssai-verification.md) for what was actually tested and the remaining coverage limits.
+
+### Playback regression checks
+
+```bash
+npm test                 # URL parsing and playback-policy checks
+npm run build
+npm run test:fixture     # Requires ffmpeg with libx264; creates synthetic media
+npm run preview          # Serves dist/ on port 5000 and local test fixtures
+```
+
+In another terminal:
+
+```bash
+# Use an installed Chromium that supports H.264/AAC, or Playwright's installed browser.
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:playback
+```
+
+`PLAYBACK_BASE_URL` can point the tests at another preview origin. For Replit's installed browser, the executable is `/repl/tools/bin/chromium`. The fixture is **synthetic**, not an ad-provider session: blue content (0–4 seconds), red ad (4–8), green content (8–12). Both boundaries reset timestamps and use `EXT-X-DISCONTINUITY`. Tests confirm frame colors, successful segment requests, natural playback, muted autoplay, manual audible play, source changes, and explicit malformed-query failure. Generated media and browser outputs are ignored by Git and never copied into the production build.
 
 ## Troubleshooting
 
