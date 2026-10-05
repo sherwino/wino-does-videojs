@@ -4,6 +4,10 @@
   "description": "VideoJS player with dynamic version loading and URL parameter configuration",
   "main": "dist/bundle.js",
   "scripts": {
+    "test": "node --test tests/player-config.test.mjs",
+    "test:fixture": "node tests/generate-hls-fixture.mjs",
+    "test:playback": "playwright test",
+    "preview": "node scripts/preview-server.cjs",
     "start": "concurrently \"npm run dev\" \"npm run dev-server\"",
     "dev": "rollup -c -w --bundleConfigAsCjs --environment DEBUG:true",
     "build": "rollup -c --bundleConfigAsCjs",
@@ -22,12 +26,15 @@
     "@rollup/plugin-node-resolve": "latest",
     "@rollup/plugin-replace": "latest",
     "@rollup/plugin-terser": "latest",
-    "concurrently": "latest",
+    "concurrently": "^9.2.4",
     "core-js": "^3.47.0",
     "regenerator-runtime": "^0.14.1",
     "rollup": "latest",
     "rollup-plugin-copy": "latest",
     "rollup-plugin-livereload": "latest",
     "rollup-plugin-serve": "latest"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

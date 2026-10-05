@@ -1,5 +1,6 @@
 // Import polyfills for older browsers (Chrome 52+)
 import "regenerator-runtime/runtime.js";
+import { parsePlayerQuery, applyPlaybackPolicy, displayParams } from "./player-config.mjs";
 
 // Global variables for logging
 let errorLog;
@@ -26,6 +27,7 @@ const MEDIA_API_URL =
 
 // Initial media index
 let currentMediaIndex = 0;
+let sourceOverrideActive = false;
 
 // Utility functions for logging
 function logError(message) {
@@ -63,7 +65,7 @@ function logStatus(message) {
 
   // Also update player status if available
   if (playerStatus) {
-    playerStatus.innerHTML = `<span class="log-info">[info] ${message}</span>`;
+    playerStatus.textContent = `[info] ${message}`;
   }
 
   // Also log to console
@@ -96,7 +98,7 @@ function logPlayerStatus(type, ...args) {
     .join(" ");
 
   // Update the player status element
-  playerStatus.innerHTML = `<span class="log-${type}">[${type}] ${message}</span>`;
+  playerStatus.textContent = `[${type}] ${message}`;
 
   // Also log to console for debugging
   console[type]("[videojs-player]", ...args);
@@ -150,35 +152,7 @@ async function loadMediaFromAPI() {
 
 // Parse URL parameters with type conversion for VideoJS options
 function getUrlParams() {
-  const params = {};
-  const queryString = window.location.search.substring(1);
-  const pairs = queryString.split("&");
-
-  for (const pair of pairs) {
-    if (pair === "") continue;
-    const parts = pair.split("=");
-    const key = decodeURIComponent(parts[0]);
-    let value = decodeURIComponent(parts[1] || "");
-
-    // Convert string values to appropriate types for VideoJS
-    if (value === "true") value = true;
-    else if (value === "false") value = false;
-    else if (!isNaN(Number(value)) && value !== "") value = Number(value);
-    // Handle array values (e.g., playbackRates=0.5,1,1.5,2)
-    else if (value.includes(',')) {
-      const arrayValues = value.split(',').map(v => {
-        if (v === "true") return true;
-        if (v === "false") return false;
-        if (!isNaN(Number(v)) && v !== "") return Number(v);
-        return v;
-      });
-      value = arrayValues;
-    }
-
-    params[key] = value;
-  }
-
-  return params;
+  return parsePlayerQuery(window.location.search);
 }
 
 // Convert URL parameters to VideoJS options object
@@ -223,7 +197,7 @@ function updateUrlParamsDisplay() {
   if (urlParamsElement) {
     const hasParams = Object.keys(urlParams).length > 0;
     if (hasParams) {
-      urlParamsElement.textContent = "URL Params: " + JSON.stringify(urlParams);
+      urlParamsElement.textContent = "URL Params: " + JSON.stringify(displayParams(urlParams));
       urlParamsElement.style.display = "block";
     } else {
       urlParamsElement.style.display = "none";
@@ -249,7 +223,10 @@ function updateMediaInfoDisplay() {
 
   const mediaInfoElement2 = document.querySelector(".media-info");
   if (mediaInfoElement2) {
-    if (mediaEntries.length > 0) {
+    if (sourceOverrideActive) {
+      mediaInfoElement2.textContent = "Media: Provided HLS source (URL hidden)";
+      mediaInfoElement2.style.display = "block";
+    } else if (mediaEntries.length > 0) {
       const currentEntry = mediaEntries[currentMediaIndex];
       mediaInfoElement2.textContent = `Media: ${currentEntry.title} (${
         currentMediaIndex + 1
@@ -358,6 +335,7 @@ async function loadVideoJSVersion() {
 
 // Play next video function
 function playNextVideo() {
+  sourceOverrideActive = false;
   if (mediaEntries.length > 0) {
     currentMediaIndex = (currentMediaIndex + 1) % mediaEntries.length;
     const nextMedia = mediaEntries[currentMediaIndex];
@@ -413,6 +391,7 @@ function handleKeyDown(event) {
 
   switch (event.key) {
     case "ArrowUp":
+      sourceOverrideActive = false;
       if (mediaEntries.length > 0) {
         // Move to next video, loop back to first if at the end
         currentMediaIndex = (currentMediaIndex + 1) % mediaEntries.length;
@@ -440,6 +419,7 @@ function handleKeyDown(event) {
       updateMediaInfoDisplay();
       break;
     case "ArrowDown":
+      sourceOverrideActive = false;
       if (mediaEntries.length > 0) {
         // Move to previous video, loop to last if at the beginning
         currentMediaIndex =
@@ -518,20 +498,15 @@ async function initPlayer() {
     };
 
     // Merge default options with URL parameters
-    const playerOptions = { ...defaultOptions, ...videoJSOptions };
-    
-    // Handle autoplay with mute-first strategy
-    const wantsAutoplay = playerOptions.autoplay;
-    if (wantsAutoplay) {
-      // Always start muted for autoplay compliance
-      playerOptions.autoplay = 'muted';
-      playerOptions.muted = true;
-      // Store original muted preference for progress event handling
-      playerOptions._originalMuted = videoJSOptions.muted;
-    }
+    const playerOptions = applyPlaybackPolicy({ ...defaultOptions, ...videoJSOptions });
 
     // Get stream URL from getCurrentMediaSource (handles params and media list)
     const source = getCurrentMediaSource();
+    sourceOverrideActive = Boolean(urlParams.source);
+    const resolvedSource = new URL(source, window.location.href);
+    if (!["http:", "https:"].includes(resolvedSource.protocol)) {
+      throw new Error("Unsupported source URL. Provide an HTTP(S) HLS playback URL.");
+    }
 
     // Add source to options
     playerOptions.sources = [{
@@ -539,8 +514,7 @@ async function initPlayer() {
       type: 'application/x-mpegURL'
     }];
 
-    logStatus(`Loading stream: ${source}`);
-    logStatus(`Player options: ${JSON.stringify(playerOptions)}`);
+    logStatus("Loading HLS stream (source URL hidden)");
 
     // Initialize VideoJS player
     const player = videojs('video', playerOptions);
@@ -557,17 +531,13 @@ async function initPlayer() {
       updateRenditionDisplay(player);
     });
 
-    // Handle unmuting on progress if autoplay was requested without mute
-    player.on('progress', function() {
-      if (wantsAutoplay && playerOptions._originalMuted !== true && player.muted()) {
-        logStatus("First progress detected, unmuting video");
-        player.muted(false);
-      }
-    });
-
     player.on('ended', function() {
-      logStatus("Video ended, playing next");
-      playNextVideo();
+      if (sourceOverrideActive) {
+        logStatus("Provided HLS stream ended");
+      } else {
+        logStatus("Video ended, playing next");
+        playNextVideo();
+      }
     });
 
     player.on('error', function() {
@@ -638,11 +608,13 @@ async function initialize() {
   clearErrorContainer();
   logStatus("Starting VideoJS player initialization...");
 
-  // First load media from API
-  await loadMediaFromAPI();
-
-  // Then initialize player with loaded media
-  initPlayer();
+  try {
+    // A supplied SSAI session must not depend on an unrelated media-list API.
+    if (!getUrlParams().source) await loadMediaFromAPI();
+    await initPlayer();
+  } catch (error) {
+    logError(`Player initialization failed: ${error.message}`);
+  }
 }
 
 // Start initialization when page loads - two approaches for compatibility
